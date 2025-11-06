@@ -5,6 +5,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 
 .menu-header {

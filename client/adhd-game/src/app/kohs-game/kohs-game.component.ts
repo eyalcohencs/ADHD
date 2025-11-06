@@ -67,6 +67,7 @@ export class KohsGameComponent {
 
   draggedBlockId = signal<number | null>(null);
   isDragging = signal<boolean>(false);
+  dragIndicatorPos = signal<{ x: number; y: number } | null>(null);
 
   rows = computed(() => this.gridSize() === 4 ? 2 : 4);
   cols = computed(() => this.gridSize() === 4 ? 2 : 4);
@@ -190,22 +191,78 @@ export class KohsGameComponent {
     }
   }
 
+  // Mouse events
   onMouseDown(block: Block, event: MouseEvent) {
     if (!this.isGameActive()) return;
     event.preventDefault();
-    this.draggedBlockId.set(block.id);
-    this.isDragging.set(false); // Will be set to true on mouse move
+    this.startDrag(block, event.clientX, event.clientY);
   }
 
-  onMouseMove() {
+  onMouseMove(event: MouseEvent) {
     if (this.draggedBlockId() !== null) {
-      this.isDragging.set(true);
+      this.updateDrag(event.clientX, event.clientY);
     }
   }
 
   onMouseUp(targetBlock: Block) {
     if (!this.isGameActive()) return;
+    this.endDrag(targetBlock);
+  }
 
+  onMouseLeave() {
+    this.cancelDrag();
+  }
+
+  // Touch events
+  onTouchStart(block: Block, event: TouchEvent) {
+    if (!this.isGameActive()) return;
+    event.preventDefault(); // Prevent scrolling
+    const touch = event.touches[0];
+    this.startDrag(block, touch.clientX, touch.clientY);
+  }
+
+  onTouchMove(event: TouchEvent) {
+    if (this.draggedBlockId() !== null) {
+      event.preventDefault(); // Prevent scrolling
+      const touch = event.touches[0];
+      this.updateDrag(touch.clientX, touch.clientY);
+    }
+  }
+
+  onTouchEnd(event: TouchEvent) {
+    if (!this.isGameActive()) return;
+    event.preventDefault();
+
+    const touch = event.changedTouches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+
+    // Find the block element and get its data
+    const blockElement = element?.closest('[data-block-id]');
+    if (blockElement) {
+      const blockId = parseInt(blockElement.getAttribute('data-block-id') || '-1');
+      const targetBlock = this.playerBlocks().find(b => b.id === blockId);
+      if (targetBlock) {
+        this.endDrag(targetBlock);
+        return;
+      }
+    }
+
+    this.cancelDrag();
+  }
+
+  // Common drag logic
+  private startDrag(block: Block, x: number, y: number) {
+    this.draggedBlockId.set(block.id);
+    this.isDragging.set(false);
+    this.dragIndicatorPos.set({ x, y });
+  }
+
+  private updateDrag(x: number, y: number) {
+    this.isDragging.set(true);
+    this.dragIndicatorPos.set({ x, y });
+  }
+
+  private endDrag(targetBlock: Block) {
     const draggedId = this.draggedBlockId();
 
     // Only swap if we were dragging and it's a different block
@@ -233,14 +290,19 @@ export class KohsGameComponent {
       }
     }
 
-    this.draggedBlockId.set(null);
-    this.isDragging.set(false);
+    this.cancelDrag();
   }
 
-  onMouseLeave() {
-    // Reset drag state if mouse leaves the board
+  private cancelDrag() {
     this.draggedBlockId.set(null);
     this.isDragging.set(false);
+    this.dragIndicatorPos.set(null);
+  }
+
+  getDraggedBlock(): Block | null {
+    const id = this.draggedBlockId();
+    if (id === null) return null;
+    return this.playerBlocks().find(b => b.id === id) || null;
   }
 
   private checkCompletion() {

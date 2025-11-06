@@ -6,6 +6,8 @@
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 2rem;
   gap: 2rem;
+  overscroll-behavior: contain; // Prevent pull-to-refresh on mobile
+  -webkit-overflow-scrolling: touch; // Smooth scrolling on iOS
 }
 
 .control-bar {
@@ -105,6 +107,10 @@ h3 {
 .player-board {
   background: #ffffff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  touch-action: none; // Prevent scrolling during touch interactions
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .block {
@@ -136,6 +142,36 @@ h3 {
   stroke-width: 1.5;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
   transition: all 0.2s ease;
+}
+
+// Drag indicator
+.drag-indicator {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  transform: translate(-50%, -50%);
+  opacity: 0.7;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  animation: pulse 0.3s ease-in-out infinite alternate;
+
+  .indicator-square {
+    stroke: #667eea;
+    stroke-width: 3;
+    filter: drop-shadow(0 0 8px rgba(102, 126, 234, 0.5));
+  }
+}
+
+@keyframes pulse {
+  from {
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+}
+
+.player-section {
+  position: relative; // For drag indicator positioning
 }
 
 .welcome-message {
@@ -176,20 +212,114 @@ h3 {
 @media (max-width: 768px) {
   .game-container {
     padding: 1rem;
+    overflow-x: hidden;
   }
 
   .game-area {
     flex-direction: column;
     gap: 2rem;
-    padding: 1.5rem;
+    padding: 1rem;
+    overflow-x: hidden;
+  }
+
+  .control-bar {
+    flex-direction: row;
+    width: 100%;
+    padding: 0.75rem;
+  }
+
+  .btn {
+    font-size: 0.875rem;
+    padding: 0.625rem 1rem;
+    flex: 1;
+    min-width: auto;
+  }
+
+  .target-section,
+  .player-section {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  h3 {
+    font-size: 1.25rem;
+  }
+
+  .instructions {
+    font-size: 0.8rem;
+  }
+
+  .board {
+    padding: 0.5rem;
+  }
+
+  .welcome-message {
+    padding: 2rem 1.5rem;
+
+    h2 {
+      font-size: 1.5rem;
+    }
+
+    p {
+      font-size: 1rem;
+    }
+  }
+}
+
+// Extra small devices
+@media (max-width: 480px) {
+  .game-container {
+    padding: 0.5rem;
   }
 
   .control-bar {
     flex-direction: column;
-    width: 100%;
+    gap: 0.5rem;
   }
 
   .btn {
     width: 100%;
+    font-size: 0.875rem;
+  }
+
+  .game-area {
+    padding: 0.75rem;
+    gap: 1.5rem;
+  }
+
+  h3 {
+    font-size: 1.125rem;
+  }
+
+  .board {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+// Landscape mobile
+@media (max-height: 600px) and (orientation: landscape) {
+  .game-container {
+    padding: 0.5rem;
+  }
+
+  .game-area {
+    flex-direction: row;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .target-section,
+  .player-section {
+    flex: 1;
+  }
+
+  h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .instructions {
+    font-size: 0.75rem;
   }
 }

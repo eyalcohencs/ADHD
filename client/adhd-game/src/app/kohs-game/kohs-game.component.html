@@ -68,17 +68,21 @@
         [attr.height]="playerBoardSize()"
         [attr.viewBox]="'0 0 ' + playerBoardSize() + ' ' + playerBoardSize()"
         class="board player-board"
-        (mousemove)="onMouseMove()"
+        (mousemove)="onMouseMove($event)"
         (mouseleave)="onMouseLeave()"
+        (touchmove)="onTouchMove($event)"
       >
         <ng-container *ngFor="let block of playerBlocks()">
           <g
             class="block draggable"
             [class.dragging]="draggedBlockId() === block.id"
+            [attr.data-block-id]="block.id"
             [attr.transform]="'translate(' + blockX(block) + ',' + blockY(block) + ') rotate(' + block.rotation + ' ' + center() + ' ' + center() + ')'"
             (click)="onBlockClick(block)"
             (mousedown)="onMouseDown(block, $event)"
             (mouseup)="onMouseUp(block)"
+            (touchstart)="onTouchStart(block, $event)"
+            (touchend)="onTouchEnd($event)"
           >
             <!-- Solid color blocks -->
             <rect
@@ -109,6 +113,49 @@
           </g>
         </ng-container>
       </svg>
+
+      <!-- Drag Indicator -->
+      <div
+        *ngIf="isDragging() && dragIndicatorPos() && getDraggedBlock()"
+        class="drag-indicator"
+        [style.left.px]="dragIndicatorPos()!.x"
+        [style.top.px]="dragIndicatorPos()!.y"
+      >
+        <svg
+          [attr.width]="cellSize * 0.5"
+          [attr.height]="cellSize * 0.5"
+          [attr.viewBox]="'0 0 ' + cellSize + ' ' + cellSize"
+        >
+          <g [attr.transform]="'rotate(' + getDraggedBlock()!.rotation + ' ' + center() + ' ' + center() + ')'">
+            <!-- Solid color blocks -->
+            <rect
+              *ngIf="getBlockFace(getDraggedBlock()!).type === 'solid'"
+              class="indicator-square"
+              [attr.width]="cellSize"
+              [attr.height]="cellSize"
+              rx="6"
+              ry="6"
+              [attr.fill]="getSolidColor(getDraggedBlock()!)"
+            ></rect>
+
+            <!-- Diagonal blocks -->
+            <g *ngIf="getBlockFace(getDraggedBlock()!).type === 'diagonal'">
+              <rect
+                class="indicator-square"
+                [attr.width]="cellSize"
+                [attr.height]="cellSize"
+                rx="6"
+                ry="6"
+                [attr.fill]="getDiagonalColors(getDraggedBlock()!).color1"
+              ></rect>
+              <polygon
+                [attr.points]="'0,0 ' + cellSize + ',0 ' + cellSize + ',' + cellSize"
+                [attr.fill]="getDiagonalColors(getDraggedBlock()!).color2"
+              ></polygon>
+            </g>
+          </g>
+        </svg>
+      </div>
     </div>
   </div>
 
