@@ -17,7 +17,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/adhd-game/browser",
+            "outputPath": "dist/adhd-game",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
@@ -26,6 +26,9 @@
             "tsConfig": "tsconfig.app.json",
             "inlineStyleLanguage": "scss",
             "assets": [
+              "src/favicon.ico",
+              "src/assets",
+              "static.json",
               {
                 "glob": "**/*",
                 "input": "public"
