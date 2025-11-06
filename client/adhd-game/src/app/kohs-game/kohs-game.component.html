@@ -1,0 +1,27 @@
+<p>kohs-game works!</p>
+<div class="wrapper">
+    <svg
+      [attr.width]="boardSize()"
+      [attr.height]="boardSize()"
+      [attr.viewBox]="'0 0 ' + boardSize() + ' ' + boardSize()"
+      class="board"
+    >
+      <ng-container *ngFor="let cell of cells()">
+        <g
+          class="cell"
+          [attr.transform]="'translate(' + cellX(cell) + ',' + cellY(cell) + ') rotate(' + cell.angle + ' ' + center() + ' ' + center() + ')'"
+          (click)="onCellClick(cell)"
+        >
+          <rect
+            class="square"
+            [attr.width]="cellSize"
+            [attr.height]="cellSize"
+            rx="10"
+            ry="10"
+          ></rect>
+  
+          <polygon class="triangle" [attr.points]="trianglePoints()"></polygon>
+        </g>
+      </ng-container>
+    </svg>
+  </div>
