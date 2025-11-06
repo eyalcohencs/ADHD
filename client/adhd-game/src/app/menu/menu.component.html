@@ -1,0 +1,46 @@
+<div class="menu-container">
+  <!-- Header -->
+  <header class="menu-header">
+    <h1>ADHD Cognitive Games</h1>
+    <p class="subtitle">Interactive assessments for attention and cognitive skills</p>
+
+    <div class="stats-banner" *ngIf="getTotalGames() > 0">
+      <span>🎮 Games Played: {{ getTotalGames() }}</span>
+      <button class="analytics-btn" (click)="navigateToAnalytics()">
+        View Analytics →
+      </button>
+    </div>
+  </header>
+
+  <!-- Game Grid -->
+  <div class="games-grid">
+    <div
+      *ngFor="let game of games"
+      class="game-card"
+      [class.available]="game.status === 'available'"
+      [class.coming-soon]="game.status === 'coming-soon'"
+      [style.--card-color]="game.color"
+      (click)="navigateToGame(game)"
+    >
+      <div class="game-icon">{{ game.icon }}</div>
+      <h2 class="game-title">{{ game.title }}</h2>
+      <p class="game-description">{{ game.description }}</p>
+
+      <div class="game-status" *ngIf="game.status === 'coming-soon'">
+        Coming Soon
+      </div>
+      <div class="game-status play-btn" *ngIf="game.status === 'available'">
+        Play Now
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer Info -->
+  <footer class="menu-footer">
+    <p>Choose a game to begin your cognitive assessment</p>
+    <p class="info-text">
+      All data is stored locally in your browser.
+      <span class="highlight">No data is sent to servers yet.</span>
+    </p>
+  </footer>
+</div>

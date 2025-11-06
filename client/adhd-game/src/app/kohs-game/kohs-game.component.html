@@ -1,27 +1,121 @@
-<p>kohs-game works!</p>
-<div class="wrapper">
-    <svg
-      [attr.width]="boardSize()"
-      [attr.height]="boardSize()"
-      [attr.viewBox]="'0 0 ' + boardSize() + ' ' + boardSize()"
-      class="board"
-    >
-      <ng-container *ngFor="let cell of cells()">
-        <g
-          class="cell"
-          [attr.transform]="'translate(' + cellX(cell) + ',' + cellY(cell) + ') rotate(' + cell.angle + ' ' + center() + ' ' + center() + ')'"
-          (click)="onCellClick(cell)"
-        >
-          <rect
-            class="square"
-            [attr.width]="cellSize"
-            [attr.height]="cellSize"
-            rx="10"
-            ry="10"
-          ></rect>
-  
-          <polygon class="triangle" [attr.points]="trianglePoints()"></polygon>
-        </g>
-      </ng-container>
-    </svg>
+<div class="game-container">
+  <!-- Control Bar -->
+  <div class="control-bar">
+    <button class="btn back-btn" (click)="goBackToMenu()">
+      ← Menu
+    </button>
+    <button class="btn" (click)="startGame(4)" [class.active]="gridSize() === 4 && isGameActive()">
+      4 Blocks (Easy)
+    </button>
+    <button class="btn" (click)="startGame(16)" [class.active]="gridSize() === 16 && isGameActive()">
+      16 Blocks (Medium)
+    </button>
   </div>
+
+  <!-- Game Area -->
+  <div class="game-area" *ngIf="isGameActive()">
+    <!-- Target Pattern (Test Card) -->
+    <div class="target-section">
+      <h3>Target Pattern</h3>
+      <svg
+        [attr.width]="targetBoardSize()"
+        [attr.height]="targetBoardSize()"
+        [attr.viewBox]="'0 0 ' + targetBoardSize() + ' ' + targetBoardSize()"
+        class="board target-board"
+      >
+        <ng-container *ngFor="let block of targetPattern()">
+          <g
+            class="block"
+            [attr.transform]="'translate(' + blockX(block, 0.6) + ',' + blockY(block, 0.6) + ') rotate(' + block.rotation + ' ' + center(0.6) + ' ' + center(0.6) + ')'"
+          >
+            <!-- Solid color blocks -->
+            <rect
+              *ngIf="getBlockFace(block).type === 'solid'"
+              class="block-square"
+              [attr.width]="cellSize * 0.6"
+              [attr.height]="cellSize * 0.6"
+              rx="4"
+              ry="4"
+              [attr.fill]="getSolidColor(block)"
+            ></rect>
+
+            <!-- Diagonal blocks -->
+            <g *ngIf="getBlockFace(block).type === 'diagonal'">
+              <rect
+                class="block-square"
+                [attr.width]="cellSize * 0.6"
+                [attr.height]="cellSize * 0.6"
+                rx="4"
+                ry="4"
+                [attr.fill]="getDiagonalColors(block).color1"
+              ></rect>
+              <polygon
+                [attr.points]="'0,0 ' + (cellSize * 0.6) + ',0 ' + (cellSize * 0.6) + ',' + (cellSize * 0.6)"
+                [attr.fill]="getDiagonalColors(block).color2"
+              ></polygon>
+            </g>
+          </g>
+        </ng-container>
+      </svg>
+    </div>
+
+    <!-- Player Grid -->
+    <div class="player-section">
+      <h3>Your Blocks</h3>
+      <p class="instructions">Click to rotate • Drag to swap</p>
+      <svg
+        [attr.width]="playerBoardSize()"
+        [attr.height]="playerBoardSize()"
+        [attr.viewBox]="'0 0 ' + playerBoardSize() + ' ' + playerBoardSize()"
+        class="board player-board"
+        (mousemove)="onMouseMove()"
+        (mouseleave)="onMouseLeave()"
+      >
+        <ng-container *ngFor="let block of playerBlocks()">
+          <g
+            class="block draggable"
+            [class.dragging]="draggedBlockId() === block.id"
+            [attr.transform]="'translate(' + blockX(block) + ',' + blockY(block) + ') rotate(' + block.rotation + ' ' + center() + ' ' + center() + ')'"
+            (click)="onBlockClick(block)"
+            (mousedown)="onMouseDown(block, $event)"
+            (mouseup)="onMouseUp(block)"
+          >
+            <!-- Solid color blocks -->
+            <rect
+              *ngIf="getBlockFace(block).type === 'solid'"
+              class="block-square"
+              [attr.width]="cellSize"
+              [attr.height]="cellSize"
+              rx="6"
+              ry="6"
+              [attr.fill]="getSolidColor(block)"
+            ></rect>
+
+            <!-- Diagonal blocks -->
+            <g *ngIf="getBlockFace(block).type === 'diagonal'">
+              <rect
+                class="block-square"
+                [attr.width]="cellSize"
+                [attr.height]="cellSize"
+                rx="6"
+                ry="6"
+                [attr.fill]="getDiagonalColors(block).color1"
+              ></rect>
+              <polygon
+                [attr.points]="'0,0 ' + cellSize + ',0 ' + cellSize + ',' + cellSize"
+                [attr.fill]="getDiagonalColors(block).color2"
+              ></polygon>
+            </g>
+          </g>
+        </ng-container>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Welcome Message -->
+  <div class="welcome-message" *ngIf="!isGameActive()">
+    <h2>Kohs Block Design Test</h2>
+    <p>Match the target pattern by rotating and swapping blocks</p>
+    <p class="hint">Choose a difficulty level to start</p>
+  </div>
+</div>

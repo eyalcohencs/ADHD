@@ -1,14 +1,29 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, signal } from '@angular/core';
+import { Router } from '@angular/router';
+import { GameSessionService } from '../services/game-session.service';
 
-interface Cell {
-  index: number;
+type FaceType = 'solid' | 'diagonal' | 'half-vertical' | 'half-horizontal';
+type ColorName = 'red' | 'white' | 'blue' | 'yellow';
+
+interface BlockFace {
+  type: FaceType;
+  colors: ColorName[];
+}
+
+interface Block {
+  id: number;
   row: number;
   col: number;
-  angle: number;
-  clicked: boolean;
-};
+  faceIndex: number;  // Which of the 6 faces is showing (0-5)
+  rotation: number;   // 0, 90, 180, 270
+}
 
+interface GameMetrics {
+  startTime: number | null;
+  rotationCount: number;
+  dragCount: number;
+}
 
 @Component({
   selector: 'app-kohs-game',
@@ -18,62 +33,310 @@ interface Cell {
   styleUrl: './kohs-game.component.scss'
 })
 export class KohsGameComponent {
-  readonly rows = 4;
-  readonly cols = 4;
-  readonly cellSize = 120;
+  readonly cellSize = 100;
   readonly gap = 8;
 
-  private initCells(): Cell[] {
-    const out: Cell[] = [];
-    let idx = 0;
-    for (let r = 0; r < this.rows; r++) {
-      for (let c = 0; c < this.cols; c++) {
-        out.push({ index: idx++, row: r, col: c, angle: 0, clicked: false });
-      }
-    }
-    return out;
-  }
+  private currentSessionId: string | null = null;
 
-  cells = signal<Cell[]>(this.initCells());
+  // The 6 faces of a Kohs block
+  readonly BLOCK_FACES: BlockFace[] = [
+    { type: 'solid', colors: ['red'] },
+    { type: 'solid', colors: ['white'] },
+    { type: 'solid', colors: ['blue'] },
+    { type: 'solid', colors: ['yellow'] },
+    { type: 'diagonal', colors: ['red', 'white'] },
+    { type: 'diagonal', colors: ['blue', 'yellow'] }
+  ];
 
-  boardSize = computed(() =>
-    this.cols * this.cellSize + (this.cols - 1) * this.gap
+  readonly COLOR_MAP: Record<ColorName, string> = {
+    red: '#ef4444',
+    white: '#ffffff',
+    blue: '#3b82f6',
+    yellow: '#fbbf24'
+  };
+
+  gridSize = signal<4 | 16>(4);
+  targetPattern = signal<Block[]>([]);
+  playerBlocks = signal<Block[]>([]);
+  isGameActive = signal<boolean>(false);
+  metrics = signal<GameMetrics>({
+    startTime: null,
+    rotationCount: 0,
+    dragCount: 0
+  });
+
+  draggedBlockId = signal<number | null>(null);
+  isDragging = signal<boolean>(false);
+
+  rows = computed(() => this.gridSize() === 4 ? 2 : 4);
+  cols = computed(() => this.gridSize() === 4 ? 2 : 4);
+
+  playerBoardSize = computed(() =>
+    this.cols() * this.cellSize + (this.cols() - 1) * this.gap
   );
 
-  onCellClick(cell: Cell) {
-    cell.angle = (cell.angle + 90) % 360;
+  targetBoardSize = computed(() => {
+    const scale = 0.6;
+    return this.cols() * this.cellSize * scale + (this.cols() - 1) * this.gap * scale;
+  });
 
-    if (!cell.clicked) {
-      cell.clicked = true;
-      console.log(`square no ${cell.index} was clicked`);
+  constructor(
+    private router: Router,
+    private gameSessionService: GameSessionService
+  ) {}
+
+  startGame(size: 4 | 16) {
+    this.gridSize.set(size);
+    const rows = size === 4 ? 2 : 4;
+    const cols = size === 4 ? 2 : 4;
+
+    // Generate target pattern with specific difficulty
+    const target = this.generateTargetPattern(rows, cols, size === 4 ? 'easy' : 'medium');
+    this.targetPattern.set(target);
+
+    // Copy target blocks and randomize their positions and rotations
+    const player = this.createShuffledBlocks(target);
+    this.playerBlocks.set(player);
+
+    // Reset metrics
+    this.metrics.set({
+      startTime: Date.now(),
+      rotationCount: 0,
+      dragCount: 0
+    });
+
+    // Start tracking session
+    const difficulty = size === 4 ? '4-blocks' : '16-blocks';
+    this.currentSessionId = this.gameSessionService.startSession('kohs', difficulty as '4-blocks' | '16-blocks');
+
+    this.isGameActive.set(true);
+    console.log('Game started with', size, 'blocks');
+  }
+
+  private generateTargetPattern(rows: number, cols: number, difficulty: 'easy' | 'medium' | 'hard'): Block[] {
+    const blocks: Block[] = [];
+    let id = 0;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        let faceIndex: number;
+        let rotation: number;
+
+        if (difficulty === 'easy') {
+          // Easy: mostly solid colors, some diagonals
+          faceIndex = Math.random() < 0.7
+            ? Math.floor(Math.random() * 4)  // Solid colors (0-3)
+            : 4 + Math.floor(Math.random() * 2);  // Diagonals (4-5)
+          rotation = [0, 90, 180, 270][Math.floor(Math.random() * 4)];
+        } else if (difficulty === 'medium') {
+          // Medium: mix of solid and diagonal
+          faceIndex = Math.floor(Math.random() * 6);
+          rotation = [0, 90, 180, 270][Math.floor(Math.random() * 4)];
+        } else {
+          // Hard: more diagonals
+          faceIndex = Math.random() < 0.3
+            ? Math.floor(Math.random() * 4)
+            : 4 + Math.floor(Math.random() * 2);
+          rotation = [0, 90, 180, 270][Math.floor(Math.random() * 4)];
+        }
+
+        blocks.push({ id: id++, row: r, col: c, faceIndex, rotation });
+      }
     }
 
-    const allClicked = this.cells().every(c => c.clicked);
-    if (allClicked) {
-      console.log('all squares were clicked');
+    return blocks;
+  }
+
+  private createShuffledBlocks(targetBlocks: Block[]): Block[] {
+    // Copy the target blocks with same faceIndex but randomize positions and rotations
+    const shuffledBlocks = targetBlocks.map(block => ({
+      ...block,
+      rotation: [0, 90, 180, 270][Math.floor(Math.random() * 4)]
+    }));
+
+    // Shuffle positions using Fisher-Yates algorithm
+    const positions = targetBlocks.map(b => ({ row: b.row, col: b.col }));
+    for (let i = positions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [positions[i], positions[j]] = [positions[j], positions[i]];
     }
 
-    this.cells.update(arr => arr.map(c => (c.index === cell.index ? cell : c)));
+    // Assign shuffled positions
+    shuffledBlocks.forEach((block, index) => {
+      block.row = positions[index].row;
+      block.col = positions[index].col;
+    });
+
+    return shuffledBlocks;
   }
 
-  cellX(cell: Cell) {
-    return cell.col * (this.cellSize + this.gap);
-  }
-  cellY(cell: Cell) {
-    return cell.row * (this.cellSize + this.gap);
-  }
-  center() {
-    return this.cellSize / 2;
+  onBlockClick(block: Block) {
+    if (!this.isGameActive()) return;
+
+    // Only rotate if not dragging
+    if (!this.isDragging()) {
+      // Rotate 90 degrees
+      const newRotation = (block.rotation + 90) % 360;
+
+      this.playerBlocks.update(blocks =>
+        blocks.map(b => b.id === block.id ? { ...b, rotation: newRotation } : b)
+      );
+
+      // Update metrics
+      this.metrics.update(m => ({ ...m, rotationCount: m.rotationCount + 1 }));
+
+      // Check for completion
+      this.checkCompletion();
+    }
   }
 
-  trianglePoints(): string {
-    const w = this.cellSize;
-    const baseLeftX = 0.2 * w;
-    const baseRightX = 0.8 * w;
-    const baseY = 0;
-    const tipX = w / 2;
-    const tipY = w / 2;
-    return `${baseLeftX},${baseY} ${baseRightX},${baseY} ${tipX},${tipY}`;
+  onMouseDown(block: Block, event: MouseEvent) {
+    if (!this.isGameActive()) return;
+    event.preventDefault();
+    this.draggedBlockId.set(block.id);
+    this.isDragging.set(false); // Will be set to true on mouse move
   }
 
+  onMouseMove() {
+    if (this.draggedBlockId() !== null) {
+      this.isDragging.set(true);
+    }
+  }
+
+  onMouseUp(targetBlock: Block) {
+    if (!this.isGameActive()) return;
+
+    const draggedId = this.draggedBlockId();
+
+    // Only swap if we were dragging and it's a different block
+    if (draggedId !== null && this.isDragging() && draggedId !== targetBlock.id) {
+      const draggedBlock = this.playerBlocks().find(b => b.id === draggedId);
+
+      if (draggedBlock) {
+        // Swap positions
+        this.playerBlocks.update(blocks => {
+          return blocks.map(b => {
+            if (b.id === draggedId) {
+              return { ...b, row: targetBlock.row, col: targetBlock.col };
+            } else if (b.id === targetBlock.id) {
+              return { ...b, row: draggedBlock.row, col: draggedBlock.col };
+            }
+            return b;
+          });
+        });
+
+        // Update metrics
+        this.metrics.update(m => ({ ...m, dragCount: m.dragCount + 1 }));
+
+        // Check for completion
+        this.checkCompletion();
+      }
+    }
+
+    this.draggedBlockId.set(null);
+    this.isDragging.set(false);
+  }
+
+  onMouseLeave() {
+    // Reset drag state if mouse leaves the board
+    this.draggedBlockId.set(null);
+    this.isDragging.set(false);
+  }
+
+  private checkCompletion() {
+    const target = this.targetPattern();
+    const player = this.playerBlocks();
+
+    // Sort both arrays by row and col to compare
+    const sortedTarget = [...target].sort((a, b) => a.row * 10 + a.col - (b.row * 10 + b.col));
+    const sortedPlayer = [...player].sort((a, b) => a.row * 10 + a.col - (b.row * 10 + b.col));
+
+    const isMatch = sortedTarget.every((t, i) => {
+      const p = sortedPlayer[i];
+
+      // Face index must always match
+      if (t.faceIndex !== p.faceIndex) {
+        return false;
+      }
+
+      // For solid color blocks (faceIndex 0-3), rotation doesn't matter
+      const face = this.BLOCK_FACES[t.faceIndex];
+      if (face.type === 'solid') {
+        return true; // Solid blocks match regardless of rotation
+      }
+
+      // For diagonal blocks (faceIndex 4-5), rotation must match
+      return t.rotation === p.rotation;
+    });
+
+    if (isMatch) {
+      this.onGameComplete();
+    }
+  }
+
+  private onGameComplete() {
+    const m = this.metrics();
+    const elapsedSeconds = m.startTime ? ((Date.now() - m.startTime) / 1000) : 0;
+
+    // Let the user see their final move before showing the alert
+    setTimeout(() => {
+      console.log('FINISH');
+      console.log('Metrics:', {
+        timeSeconds: elapsedSeconds,
+        rotations: m.rotationCount,
+        drags: m.dragCount
+      });
+
+      // Save session to storage
+      this.gameSessionService.completeSession({
+        timeSeconds: elapsedSeconds,
+        rotations: m.rotationCount,
+        drags: m.dragCount
+      });
+
+      alert(`Finish at ${elapsedSeconds.toFixed(2)} seconds!\n\nRotations: ${m.rotationCount}\nDrags: ${m.dragCount}\n\nYour score has been saved!`);
+
+      this.isGameActive.set(false);
+
+      // Navigate back to menu
+      this.router.navigate(['/']);
+    }, 500);
+  }
+
+  goBackToMenu(): void {
+    this.router.navigate(['/']);
+  }
+
+  blockX(block: Block, scale: number = 1) {
+    return block.col * (this.cellSize * scale + this.gap * scale);
+  }
+
+  blockY(block: Block, scale: number = 1) {
+    return block.row * (this.cellSize * scale + this.gap * scale);
+  }
+
+  getBlockFace(block: Block): BlockFace {
+    return this.BLOCK_FACES[block.faceIndex];
+  }
+
+  getBlockColors(block: Block): ColorName[] {
+    return this.getBlockFace(block).colors;
+  }
+
+  getSolidColor(block: Block): string {
+    const colors = this.getBlockColors(block);
+    return this.COLOR_MAP[colors[0]];
+  }
+
+  getDiagonalColors(block: Block): { color1: string; color2: string } {
+    const colors = this.getBlockColors(block);
+    return {
+      color1: this.COLOR_MAP[colors[0]],
+      color2: this.COLOR_MAP[colors[1]]
+    };
+  }
+
+  center(scale: number = 1) {
+    return (this.cellSize * scale) / 2;
+  }
 }

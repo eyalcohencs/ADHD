@@ -1,0 +1,112 @@
+<div class="analytics-container">
+  <!-- Header -->
+  <header class="analytics-header">
+    <button class="back-btn" (click)="goBack()">← Back to Menu</button>
+    <h1>📊 Performance Analytics</h1>
+    <p class="subtitle">Track your cognitive assessment progress</p>
+  </header>
+
+  <!-- No Data State -->
+  <div class="no-data" *ngIf="analytics().totalGames === 0">
+    <div class="no-data-icon">📈</div>
+    <h2>No Games Played Yet</h2>
+    <p>Complete some games to see your analytics here!</p>
+    <button class="primary-btn" (click)="goBack()">Start Playing</button>
+  </div>
+
+  <!-- Analytics Content -->
+  <div class="analytics-content" *ngIf="analytics().totalGames > 0">
+    <!-- Summary Cards -->
+    <div class="summary-grid">
+      <div class="stat-card">
+        <div class="stat-icon">🎮</div>
+        <div class="stat-value">{{ analytics().totalGames }}</div>
+        <div class="stat-label">Games Completed</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-value">{{ formatTime(analytics().averageTime) }}</div>
+        <div class="stat-label">Average Time</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon">🏆</div>
+        <div class="stat-value">{{ formatTime(analytics().fastestTime) }}</div>
+        <div class="stat-label">Fastest Time</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon">🔄</div>
+        <div class="stat-value">{{ analytics().averageRotations.toFixed(1) }}</div>
+        <div class="stat-label">Avg Rotations</div>
+      </div>
+    </div>
+
+    <!-- Recent Sessions -->
+    <div class="sessions-section">
+      <h2>Recent Sessions</h2>
+      <div class="sessions-list">
+        <div
+          *ngFor="let session of analytics().recentSessions"
+          class="session-card"
+        >
+          <div class="session-header">
+            <div>
+              <h3>{{ getGameName(session) }}</h3>
+              <span class="difficulty-badge">{{ getDifficultyBadge(session.difficulty) }}</span>
+            </div>
+            <div class="session-date">{{ formatDate(session.timestamp) }}</div>
+          </div>
+
+          <div class="session-metrics">
+            <div class="metric">
+              <span class="metric-label">Time:</span>
+              <span class="metric-value">{{ formatTime(session.timeSeconds) }}</span>
+            </div>
+            <div class="metric" *ngIf="session.rotations !== undefined">
+              <span class="metric-label">Rotations:</span>
+              <span class="metric-value">{{ session.rotations }}</span>
+            </div>
+            <div class="metric" *ngIf="session.drags !== undefined">
+              <span class="metric-label">Drags:</span>
+              <span class="metric-value">{{ session.drags }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- All Sessions -->
+    <div class="all-sessions-section" *ngIf="allSessions().length > 5">
+      <details>
+        <summary>View All Sessions ({{ allSessions().length }})</summary>
+        <div class="sessions-table">
+          <div class="table-row header-row">
+            <div>Game</div>
+            <div>Difficulty</div>
+            <div>Date</div>
+            <div>Time</div>
+            <div>Rotations</div>
+            <div>Drags</div>
+          </div>
+          <div *ngFor="let session of allSessions()" class="table-row">
+            <div>{{ getGameName(session) }}</div>
+            <div>{{ getDifficultyBadge(session.difficulty) }}</div>
+            <div>{{ formatDate(session.timestamp) }}</div>
+            <div>{{ formatTime(session.timeSeconds) }}</div>
+            <div>{{ session.rotations || '-' }}</div>
+            <div>{{ session.drags || '-' }}</div>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Clear Data -->
+    <div class="danger-zone">
+      <h3>⚠️ Danger Zone</h3>
+      <p>Clear all game data from local storage</p>
+      <button class="danger-btn" (click)="clearData()">Clear All Data</button>
+    </div>
+  </div>
+</div>
