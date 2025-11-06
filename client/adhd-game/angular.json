@@ -29,11 +29,6 @@
               "src/favicon.ico",
               "src/assets",
               {
-                "glob": "static.json",
-                "input": "src",
-                "output": "/"
-              },
-              {
                 "glob": "**/*",
                 "input": "public"
               }
