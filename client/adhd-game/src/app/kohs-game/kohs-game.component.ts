@@ -68,6 +68,8 @@ export class KohsGameComponent {
   draggedBlockId = signal<number | null>(null);
   isDragging = signal<boolean>(false);
   dragIndicatorPos = signal<{ x: number; y: number } | null>(null);
+  private dragStartPos: { x: number; y: number } | null = null;
+  private readonly DRAG_THRESHOLD = 15; // pixels - minimum movement to register as drag
 
   rows = computed(() => this.gridSize() === 4 ? 2 : 4);
   cols = computed(() => this.gridSize() === 4 ? 2 : 4);
@@ -174,7 +176,7 @@ export class KohsGameComponent {
   onBlockClick(block: Block) {
     if (!this.isGameActive()) return;
 
-    // Only rotate if not dragging
+    // Only rotate if not dragging (threshold not exceeded)
     if (!this.isDragging()) {
       // Rotate 90 degrees
       const newRotation = (block.rotation + 90) % 360;
@@ -189,6 +191,9 @@ export class KohsGameComponent {
       // Check for completion
       this.checkCompletion();
     }
+
+    // Reset drag state after click
+    this.cancelDrag();
   }
 
   // Mouse events
@@ -242,7 +247,17 @@ export class KohsGameComponent {
       const blockId = parseInt(blockElement.getAttribute('data-block-id') || '-1');
       const targetBlock = this.playerBlocks().find(b => b.id === blockId);
       if (targetBlock) {
-        this.endDrag(targetBlock);
+        // If we were dragging (threshold exceeded), swap blocks
+        if (this.isDragging()) {
+          this.endDrag(targetBlock);
+        } else {
+          // Otherwise it was a tap, so rotate the block
+          const draggedId = this.draggedBlockId();
+          const tappedBlock = this.playerBlocks().find(b => b.id === draggedId);
+          if (tappedBlock) {
+            this.onBlockClick(tappedBlock);
+          }
+        }
         return;
       }
     }
@@ -254,12 +269,23 @@ export class KohsGameComponent {
   private startDrag(block: Block, x: number, y: number) {
     this.draggedBlockId.set(block.id);
     this.isDragging.set(false);
+    this.dragStartPos = { x, y };
     this.dragIndicatorPos.set({ x, y });
   }
 
   private updateDrag(x: number, y: number) {
-    this.isDragging.set(true);
-    this.dragIndicatorPos.set({ x, y });
+    if (!this.dragStartPos) return;
+
+    // Calculate distance moved from start position
+    const deltaX = x - this.dragStartPos.x;
+    const deltaY = y - this.dragStartPos.y;
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+    // Only set isDragging to true if moved beyond threshold
+    if (distance > this.DRAG_THRESHOLD) {
+      this.isDragging.set(true);
+      this.dragIndicatorPos.set({ x, y });
+    }
   }
 
   private endDrag(targetBlock: Block) {
@@ -297,6 +323,7 @@ export class KohsGameComponent {
     this.draggedBlockId.set(null);
     this.isDragging.set(false);
     this.dragIndicatorPos.set(null);
+    this.dragStartPos = null;
   }
 
   getDraggedBlock(): Block | null {
